@@ -15,3 +15,5 @@ __pycache__/
 
 # Output files
 output/
+
+.scrapy/
