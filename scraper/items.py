@@ -5,17 +5,11 @@
 import scrapy
 
 
-class HtmlPageItem(scrapy.Item):
-    """For spiders that scrape HTML pages."""
-    source_url  = scrapy.Field()
-    scraped_at  = scrapy.Field()
-    page_title  = scrapy.Field()
-    raw_html    = scrapy.Field()
-
-
-class ApiResponseItem(scrapy.Item):
-    """For spiders that call REST APIs."""
-    endpoint    = scrapy.Field()
-    scraped_at  = scrapy.Field()
-    status_code = scrapy.Field()
-    payload     = scrapy.Field()  # raw JSON stored as a dict
+class ScrapedItem(scrapy.Item):
+    run_id         = scrapy.Field()   # unique ID for each scrape run
+    data           = scrapy.Field()   # raw payload as JSON string
+    extraction_type = scrapy.Field()  # e.g. "transfermarkt_squads"
+    execution_date = scrapy.Field()   # when the pipeline ran
+    start_date     = scrapy.Field()   # date range start (if applicable)
+    end_date       = scrapy.Field()   # date range end (if applicable)
+    endpoint       = scrapy.Field()   # the URL that was scraped
