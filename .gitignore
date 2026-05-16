@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Scrapy cache
+.scrapy/
+
+# Environment
+.env
+
+# VS Code
+.vscode/
+
+# Output files
+output/
