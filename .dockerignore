@@ -1,0 +1,10 @@
+.env
+.venv
+.scrapy/
+output/
+tests/
+__pycache__/
+*.pyc
+.git
+.github
+*.json
