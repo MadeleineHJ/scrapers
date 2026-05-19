@@ -24,14 +24,10 @@ SCHEMA = [
 
 
 class BigQueryPipeline:
-    """Collects items in memory and batch loads to BigQuery when spider closes.
-    Batch loading is free tier compatible unlike streaming inserts.
-    """
-
     def __init__(self):
-        self.client       = bigquery.Client(project=os.environ["GCP_PROJECT_ID"])
-        self.dataset      = os.environ["BQ_DATASET"]
-        self._buffer      = []   # holds rows until spider finishes
+        self.client  = bigquery.Client(project=os.environ["GCP_PROJECT_ID"])
+        self.dataset = os.environ["BQ_DATASET"]
+        self._buffer      = []
         self._ensure_dataset()
         self._table_cache = set()
 
@@ -53,7 +49,6 @@ class BigQueryPipeline:
         self._table_cache.add(table_id)
 
     def process_item(self, item, spider):
-        """Buffer each item -- do not write to BQ yet."""
         table_id = (
             f"{os.environ['GCP_PROJECT_ID']}"
             f".{self.dataset}"
@@ -63,6 +58,7 @@ class BigQueryPipeline:
 
         self._buffer.append({
             "table_id": table_id,
+            "spider":   spider,
             "row": {
                 "run_id":           str(uuid.uuid4()),
                 "data":             json.dumps(item.get("data", {})),
@@ -76,32 +72,36 @@ class BigQueryPipeline:
         return item
 
     def close_spider(self, spider):
-        """Batch load all buffered rows to BigQuery when spider finishes."""
         if not self._buffer:
             spider.logger.warning("No items to load to BigQuery")
             return
 
-        # group rows by table
+        # read write disposition from spider settings
+        # defaults to WRITE_APPEND unless spider sets BIGQUERY_WRITE_DISPOSITION
+        write_disposition = getattr(
+            spider, "bigquery_write_disposition",
+            bigquery.WriteDisposition.WRITE_APPEND
+        )
+
         tables = {}
         for entry in self._buffer:
             tables.setdefault(entry["table_id"], []).append(entry["row"])
 
         for table_id, rows in tables.items():
             job_config = bigquery.LoadJobConfig(
-                schema       = SCHEMA,
-                write_disposition = bigquery.WriteDisposition.WRITE_APPEND,
-                source_format = bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+                schema            = SCHEMA,
+                write_disposition = write_disposition,
+                source_format     = bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
             )
 
-            json_data = "\n".join(json.dumps(row) for row in rows)
-
             job = self.client.load_table_from_json(
-                json_rows  = [json.loads(r) for r in json_data.splitlines()],
+                json_rows   = rows,
                 destination = table_id,
                 job_config  = job_config,
             )
-            job.result()  # wait for the job to complete
+            job.result()
 
             spider.logger.info(
-                f"Batch loaded {len(rows)} rows to {table_id}"
+                f"Batch loaded {len(rows)} rows to {table_id} "
+                f"(write_disposition={write_disposition})"
             )
